@@ -1,15 +1,12 @@
 import { Ratelimit } from "@upstash/ratelimit";
 
-// Mock Redis for debugging - completely bypass during development
-const redis = {
-  set: async () => "OK",
-  get: async () => null,
-  eval: async () => [1, Date.now() + 60000],
-  del: async () => 1,
-  exists: async () => 0,
-  expire: async () => 1,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-} as any;
+// Use real Redis for rate limiting
+import { Redis } from '@upstash/redis'
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 // Rate limiting configurations
 export const readLimiter = new Ratelimit({
@@ -45,15 +42,27 @@ export async function checkRateLimit(
   limiter: Ratelimit,
   identifier: string
 ): Promise<RateLimitResult> {
-  // Temporarily bypass rate limiting for debugging
-  console.log("🚀 Rate limit bypassed for:", identifier);
-  return {
-    success: true,
-    limit: 60,
-    remaining: 59,
-    reset: new Date(Date.now() + 60000),
-    retryAfter: undefined,
-  };
+  try {
+    const result = await limiter.limit(identifier);
+    
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: new Date(result.reset),
+      retryAfter: result.success ? undefined : Math.ceil((result.reset - Date.now()) / 1000),
+    };
+  } catch (error) {
+    console.error("Rate limit check error:", error);
+    // Fallback to allow request if rate limiting fails
+    return {
+      success: true,
+      limit: 60,
+      remaining: 59,
+      reset: new Date(Date.now() + 60000),
+      retryAfter: undefined,
+    };
+  }
 }
 
 // Helper to create user + IP identifier
