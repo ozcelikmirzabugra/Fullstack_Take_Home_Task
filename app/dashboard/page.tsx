@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { LogoutButton } from '@/components/ui/LogoutButton'
 import Link from 'next/link'
 import { Plus, CheckCircle2, Clock, AlertCircle, Archive } from 'lucide-react'
 import type { Task } from '@/lib/zod'
@@ -76,11 +77,7 @@ export default async function DashboardPage() {
                   New Task
                 </Button>
               </Link>
-              <form action="/api/auth/logout" method="post">
-                <Button variant="outline" type="submit">
-                  Logout
-                </Button>
-              </form>
+              <LogoutButton />
             </div>
           </div>
         </div>

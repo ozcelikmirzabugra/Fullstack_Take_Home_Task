@@ -58,8 +58,13 @@ export function getCORSHeaders(origin?: string): Record<string, string> {
     'Access-Control-Max-Age': '86400', // 24 hours
   };
 
+  // Handle null origin (file:// URLs, form submissions, etc.)
+  if (origin === 'null') {
+    headers['Access-Control-Allow-Origin'] = 'null';
+    headers['Access-Control-Allow-Credentials'] = 'true';
+  }
   // Check if origin is allowed
-  if (origin && allowedOrigins.includes(origin)) {
+  else if (origin && allowedOrigins.includes(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Credentials'] = 'true';
   }

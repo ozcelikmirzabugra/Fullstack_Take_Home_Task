@@ -7,7 +7,10 @@ export async function POST(request: NextRequest) {
   const { error } = await supabase.auth.signOut()
   
   // Get the origin from the request to construct absolute URLs
-  const origin = request.nextUrl.origin
+  // Handle cases where origin might be null or undefined
+  const origin = request.nextUrl.origin || 
+                 request.headers.get('host')?.startsWith('localhost') ? 'http://localhost:3000' : 
+                 `https://${request.headers.get('host')}` || 'http://localhost:3000'
   
   if (error) {
     console.error('Error signing out:', error.message)

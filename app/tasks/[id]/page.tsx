@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { TaskUpdateSchema } from "@/lib/zod";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,6 +68,16 @@ export default function TaskPage({ params }: TaskPageProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const router = useRouter();
 
+  const { user, loading } = useAuth();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      console.log("🚀 User not authenticated, redirecting to login");
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
   const form = useForm({
     defaultValues: {
       title: "",
@@ -111,7 +122,8 @@ export default function TaskPage({ params }: TaskPageProps) {
     };
 
     fetchTask();
-  }, [params, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   const onUpdate = async (data: Record<string, unknown>) => {
     if (!task) return;

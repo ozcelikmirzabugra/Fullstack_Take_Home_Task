@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/middleware";
-import { getCORSHeaders, getSecurityHeaders, generateNonce } from "@/lib/csp";
 
 export async function middleware(request: NextRequest) {
   console.log("🚀 Middleware called for:", request.url, request.method);
@@ -10,46 +9,41 @@ export async function middleware(request: NextRequest) {
     url: request.url,
     method: request.method,
     nextUrl: request.nextUrl.pathname,
-    headers: Object.fromEntries(request.headers.entries()),
+    headers: {
+      ...Object.fromEntries(request.headers.entries()),
+      // Don't log sensitive headers
+      cookie: request.headers.get('cookie') ? '[REDACTED]' : undefined,
+    },
   });
-
-  // Temporarily bypass middleware for debugging
-  if (request.url.includes("/signup") || request.url.includes("/login")) {
-    console.log("🚀 Bypassing middleware for auth pages");
-    return NextResponse.next();
-  }
 
   const { supabase, response } = createClient(request);
 
-  // Refresh session if expired - required for Server Components
-  await supabase.auth.getSession();
+  // Get authenticated user - more secure than getSession()
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  const origin = request.headers.get("origin");
+  console.log("🚀 Auth check:", { 
+    hasUser: !!user, 
+    userId: user?.id,
+    authError: authError?.message,
+    path: request.nextUrl.pathname,
+    cookies: request.headers.get('cookie') ? 'present' : 'missing'
+  });
 
-  // Handle CORS preflight requests
-  if (request.method === "OPTIONS") {
-    const corsHeaders = getCORSHeaders(origin || undefined);
-    return new NextResponse(null, {
-      status: 204,
-      headers: corsHeaders,
-    });
+  // Check if user is authenticated for protected routes
+  const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') || 
+                          request.nextUrl.pathname.startsWith('/tasks') ||
+                          request.nextUrl.pathname.startsWith('/api/tasks');
+
+  // Allow auth pages to pass through
+  if (request.url.includes("/signup") || request.url.includes("/login")) {
+    console.log("🚀 Allowing auth pages to pass through");
+    return NextResponse.next();
   }
 
-  // Generate nonce for CSP
-  const nonce = generateNonce();
-  response.headers.set("x-nonce", nonce);
-
-  // Apply security headers
-  const securityHeaders = getSecurityHeaders(nonce);
-  Object.entries(securityHeaders).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-
-  // Apply CORS headers for actual requests
-  const corsHeaders = getCORSHeaders(origin || undefined);
-  Object.entries(corsHeaders).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
+  if (isProtectedRoute && !user) {
+    console.log("🚀 Redirecting unauthenticated user to login");
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
 
   return response;
 }
